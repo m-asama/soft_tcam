@@ -59,18 +59,18 @@ main(int argc, char *argv[])
 	/*
 	for (std::uint64_t i = 0; i < 4096; ++i) {
 		for (std::uint64_t j = 0; j < 4096; ++j) {
-			std::bitset<32> d((i << 52) + (j << 20)), m(0x0000ffff0000ffff);
+			std::bitset<32> d((i << 52) + (j << 20)), m(0xffff0000ffff0000);
 			test.insert(d, m, 1, std::uint64_t((i << 52) + (j << 20)));
 		}
 	}
 	*/
 	std::bitset<32> d;
 	std::bitset<32> m;
-	d = 0x12000000; m = 0x00ffffff; test.insert(d, m, 4, 1);
-	d = 0x12340000; m = 0x0000ffff; test.insert(d, m, 3, 2);
-	d = 0x89ab0000; m = 0x0000ffff; test.insert(d, m, 3, 3);
-	d = 0x12345600; m = 0x000000ff; test.insert(d, m, 2, 4);
-	d = 0x00000000; m = 0xffffffff; test.insert(d, m, 1, 5);
+	d = 0x12000000; m = 0xff000000; test.insert(d, m, 4, 1);
+	d = 0x12340000; m = 0xffff0000; test.insert(d, m, 3, 2);
+	d = 0x89ab0000; m = 0xffff0000; test.insert(d, m, 3, 3);
+	d = 0x12345600; m = 0xffffff00; test.insert(d, m, 2, 4);
+	d = 0x00000000; m = 0x00000000; test.insert(d, m, 1, 5);
 
 	gettimeofday(&tv2, (struct timezone *)NULL);
 	getrusage(RUSAGE_SELF, &ru2);
@@ -81,11 +81,11 @@ main(int argc, char *argv[])
 
 	test.dump();
 
-	d = 0x00000000; m = 0xffffffff; test.erase(d, m, 1, 5);
-	d = 0x12345600; m = 0x000000ff; test.erase(d, m, 2, 4);
-	d = 0x89ab0000; m = 0x0000ffff; test.erase(d, m, 3, 3);
-	d = 0x12340000; m = 0x0000ffff; test.erase(d, m, 3, 2);
-	d = 0x12000000; m = 0x00ffffff; test.erase(d, m, 4, 1);
+	d = 0x00000000; m = 0x00000000; test.erase(d, m, 1, 5);
+	d = 0x12345600; m = 0xffffff00; test.erase(d, m, 2, 4);
+	d = 0x89ab0000; m = 0xffff0000; test.erase(d, m, 3, 3);
+	d = 0x12340000; m = 0xffff0000; test.erase(d, m, 3, 2);
+	d = 0x12000000; m = 0xff000000; test.erase(d, m, 4, 1);
 
 	test.dump();
 

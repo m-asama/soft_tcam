@@ -58,7 +58,7 @@ main(int argc, char *argv[])
 
 	for (std::uint64_t i = 0; i < 4096; ++i) {
 		for (std::uint64_t j = 0; j < 4096; ++j) {
-			std::bitset<64> d((i << 52) + (j << 20)), m(0x0000ffff0000ffff);
+			std::bitset<64> d((i << 52) + (j << 20)), m(0xffff0000ffff0000);
 			test.insert(d, m, 1, std::uint64_t((i << 52) + (j << 20)));
 		}
 	}
@@ -95,7 +95,7 @@ main(int argc, char *argv[])
 		for (std::uint64_t i = 0; i < 4096; ++i) {
 			k = (i << 52) + (j << 20);
 			result = test.find(k);
-/*
+			/*
 			std::cout << std::setw(16)
 				  << std::setfill('0')
 				  << std::hex
@@ -110,7 +110,7 @@ main(int argc, char *argv[])
 			} else {
 				std::cout << "nullptr" << std::endl;
 			}
-*/
+			*/
 			++find_counter;
 		}
 	}

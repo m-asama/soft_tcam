@@ -4,7 +4,7 @@
 #
 
 RM		 = rm
-CXX		 = clang++34
+CXX		 = clang++
 CXXFLAGS	 = -Wall -O2 -pipe --std=c++11 -Isoft_tcam
 
 TARGET_srcdst	 = srcdst_bench

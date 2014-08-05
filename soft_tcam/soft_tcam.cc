@@ -40,7 +40,7 @@ namespace soft_tcam {
 		std::uint64_t i;
 
 		for (i = 0; i < size; ++i) {
-			if ((mask[i] == 1) && (data[i] == 1)) {
+			if ((mask[i] == 0) && (data[i] == 1)) {
 				std::cerr << "insert: data/mask error." << std::endl;
 				return -1;
 			}
@@ -77,24 +77,24 @@ namespace soft_tcam {
 		node->insert_entry(entry);
 		entry->set_node(node);
 
-		if (mask[nearest->get_position()] == 1) {
+		if (mask[nearest->get_position()] == 0) {
 			temp = nearest->get_ndc();
 			if (temp == nullptr) {
 				nearest->set_ndc(node);
 				node->set_parent(nearest);
 				return 0;
 			}
-		} else if (data[nearest->get_position()] == 1) {
-			temp = nearest->get_n1();
+		} else if (data[nearest->get_position()] == 0) {
+			temp = nearest->get_n0();
 			if (temp == nullptr) {
-				nearest->set_n1(node);
+				nearest->set_n0(node);
 				node->set_parent(nearest);
 				return 0;
 			}
 		} else {
-			temp = nearest->get_n0();
+			temp = nearest->get_n1();
 			if (temp == nullptr) {
-				nearest->set_n0(node);
+				nearest->set_n1(node);
 				node->set_parent(nearest);
 				return 0;
 			}
@@ -211,7 +211,7 @@ namespace soft_tcam {
 		bool result = true;
 
 		for (std::uint32_t i = 0; i < size; ++i) {
-			if ((mask[i] == 0) && (key[i] != data[i])) {
+			if ((mask[i] == 1) && (key[i] != data[i])) {
 				result = false;
 			}
 		}
@@ -247,31 +247,31 @@ namespace soft_tcam {
 		if (less == nullptr) {
 			m_root = temp;
 		} else {
-			if (temp->get_mask()[less->get_position()] == 1) {
+			if (temp->get_mask()[less->get_position()] == 0) {
 				less->set_ndc(temp);
-			} else if (temp->get_data()[less->get_position()] == 1) {
-				less->set_n1(temp);
-			} else {
+			} else if (temp->get_data()[less->get_position()] == 0) {
 				less->set_n0(temp);
+			} else {
+				less->set_n1(temp);
 			}
 			temp->set_parent(less);
 		}
 
-		if (more->get_mask()[temp->get_position()] == 1) {
+		if (more->get_mask()[temp->get_position()] == 0) {
 			temp->set_ndc(more);
-		} else if (more->get_data()[temp->get_position()] == 1) {
-			temp->set_n1(more);
-		} else {
+		} else if (more->get_data()[temp->get_position()] == 0) {
 			temp->set_n0(more);
+		} else {
+			temp->set_n1(more);
 		}
 		more->set_parent(temp);
 
-		if (node->get_mask()[temp->get_position()] == 1) {
+		if (node->get_mask()[temp->get_position()] == 0) {
 			temp->set_ndc(node);
-		} else if (node->get_data()[temp->get_position()] == 1) {
-			temp->set_n1(node);
-		} else {
+		} else if (node->get_data()[temp->get_position()] == 0) {
 			temp->set_n0(node);
+		} else {
+			temp->set_n1(node);
 		}
 		node->set_parent(temp);
 
@@ -364,12 +364,12 @@ namespace soft_tcam {
 				return node;
 			}
 			position = node->get_position();
-			if (mask[position] == 1) {
+			if (mask[position] == 0) {
 				temp = node->get_ndc();
-			} else if (data[position] == 1) {
-				temp = node->get_n1();
-			} else {
+			} else if (data[position] == 0) {
 				temp = node->get_n0();
+			} else {
+				temp = node->get_n1();
 			}
 			if (temp == nullptr) {
 				return node;
@@ -400,11 +400,11 @@ retry:
 				}
 			}
 			temp = nullptr;
-			if (key[node->get_position()] == 1) {
-				temp = node->get_n1();
-			}
 			if (key[node->get_position()] == 0) {
 				temp = node->get_n0();
+			}
+			if (key[node->get_position()] == 1) {
+				temp = node->get_n1();
 			}
 			if (node->get_ndc() != nullptr) {
 				if (temp != nullptr) {

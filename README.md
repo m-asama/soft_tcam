@@ -26,12 +26,12 @@ TCAM っぽい機能を実現するライブラリです。
     	const std::uint32_t *result;
     
     	data		= 0x12340000;
-    	mask		= 0x0000ffff;
+    	mask		= 0xffff0000;
     	priority	= 0x00000010;
     	tcam.insert(data, mask, priority, 1);
     
     	data		= 0x12000000;
-    	mask		= 0x00ffffff;
+    	mask		= 0xff000000;
     	priority	= 0x00000008;
     	tcam.insert(data, mask, priority, 2);
     
@@ -46,12 +46,12 @@ TCAM っぽい機能を実現するライブラリです。
     	std::cout << std::endl;
     
     	data		= 0x12340000;
-    	mask		= 0x0000ffff;
+    	mask		= 0xffff0000;
     	priority	= 0x00000010;
     	tcam.erase(data, mask, priority, 1);
     
     	data		= 0x12000000;
-    	mask		= 0x00ffffff;
+    	mask		= 0xff000000;
     	priority	= 0x00000008;
     	tcam.erase(data, mask, priority, 2);
     

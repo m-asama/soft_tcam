@@ -1,0 +1,4 @@
+*~
+*.o
+srcdst_bench
+fullroute_bench

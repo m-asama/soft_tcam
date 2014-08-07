@@ -167,7 +167,7 @@ namespace soft_tcam {
 			  << std::endl;
 		std::cout << " node->position   mask ";
 		for (int i = 5; i < size; ++i) { std::cout << " "; }
-		std::cout << " entry->priority  entry->node      entry            entry->pointer   ..."
+		std::cout << " entry->priority  entry->node      entry            ..."
 			  << std::endl;
 		if (m_root != nullptr)
 			dump_node(m_root, 0);
@@ -469,11 +469,10 @@ retry:
 			  << node->get_mask().to_string();
 		entry = node->get_entry_head();
 		while (entry != nullptr) {
-			snprintf(buf4, 256, " %016lx %016lx %016lx %016lx",
+			snprintf(buf4, 256, " %016lx %016lx %016lx",
 					(unsigned long)entry->get_priority(),
 					(unsigned long)entry->get_node(),
-					(unsigned long)entry,
-					(unsigned long)entry->get_object());
+					(unsigned long)entry);
 			std::cout << buf4;
 			entry = entry->get_next();
 		}

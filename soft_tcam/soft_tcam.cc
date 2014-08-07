@@ -138,7 +138,7 @@ namespace soft_tcam {
 		if (node->get_entry_head() == nullptr) {
 			erase_node(node);
 		}
-		
+
 		return 0;
 	}
 
@@ -154,7 +154,7 @@ namespace soft_tcam {
 			p = &entry->get_object();
 		}
 
-		return p; 
+		return p;
 	}
 
 	template<class T, size_t size>
@@ -478,7 +478,7 @@ retry:
 			entry = entry->get_next();
 		}
 		std::cout << std::endl;
-		
+
 		if (node->get_n0() != nullptr) {
 			dump_node(node->get_n0(), depth + 1);
 		}

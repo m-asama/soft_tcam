@@ -20,7 +20,7 @@ namespace soft_tcam {
 
 		/*
 		 * ctor
-		 */	
+		 */
 		soft_tcam_entry();
 
 		/*

@@ -141,14 +141,28 @@ namespace soft_tcam {
 		soft_tcam_entry<T, size> *curr, *prev;
 
 		if (entry == nullptr) {
+			std::cerr << "insert_entry: entry is nullptr." << std::endl;
+			return -1;
+		}
+
+		if (entry->get_node() != nullptr) {
+			std::cerr << "insert_entry: entry has already inserted?" << std::endl;
 			return -1;
 		}
 
 		entry->set_node(this);
 
-		if ((m_entries == nullptr)
-		 || (entry->get_priority() > m_entries->get_priority())) {
+		if (m_entries == nullptr) {
+			entry->set_next(nullptr);
+			entry->set_prev(nullptr);
+			m_entries = entry;
+			return 0;
+		}
+
+		if (entry->get_priority() > m_entries->get_priority()) {
 			entry->set_next(m_entries);
+			entry->set_prev(nullptr);
+			m_entries->set_prev(entry);
 			m_entries = entry;
 			return 0;
 		}
@@ -163,6 +177,10 @@ namespace soft_tcam {
 			curr = curr->get_next();
 		}
 		entry->set_next(prev->get_next());
+		entry->set_prev(prev);
+		if (curr != nullptr) {
+			curr->set_prev(entry);
+		}
 		prev->set_next(entry);
 
 		return 0;
@@ -175,12 +193,17 @@ namespace soft_tcam {
 		soft_tcam_entry<T, size> *curr, *prev;
 
 		if ((m_entries == nullptr) || (entry == nullptr)) {
+			std::cerr << "erase_entry: m_entries or entry is nullptr" << std::endl;
 			return -1;
 		}
 
 		if (m_entries == entry) {
 			m_entries = entry->get_next();
+			if (m_entries != nullptr) {
+				m_entries->set_prev(nullptr);
+			}
 			entry->set_next(nullptr);
+			entry->set_prev(nullptr);
 			entry->set_node(nullptr);
 			delete entry;
 			return 0;
@@ -191,7 +214,11 @@ namespace soft_tcam {
 		while (curr != nullptr) {
 			if (curr == entry) {
 				prev->set_next(entry->get_next());
+				if (entry->get_next() != nullptr) {
+					entry->get_next()->set_prev(prev);
+				}
 				entry->set_next(nullptr);
+				entry->set_prev(nullptr);
 				entry->set_node(nullptr);
 				delete entry;
 				return 0;
@@ -200,6 +227,7 @@ namespace soft_tcam {
 			curr = curr->get_next();
 		}
 
+		std::cerr << "erase_entry: ???" << std::endl;
 		return -1;
 	}
 

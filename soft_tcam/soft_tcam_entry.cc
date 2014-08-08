@@ -12,6 +12,7 @@ namespace soft_tcam {
 	{
 		m_priority = 0;
 		m_next = nullptr;
+		m_prev = nullptr;
 		m_node = nullptr;
 		m_access_counter = 0;
 	}
@@ -80,6 +81,21 @@ namespace soft_tcam {
 	{
 		++m_access_counter;
 		return m_next;
+	}
+
+	template <class T, size_t size>
+	void
+	soft_tcam_entry<T, size>::set_prev(soft_tcam_entry<T, size> *prev)
+	{
+		m_prev = prev;
+	}
+
+	template <class T, size_t size>
+	soft_tcam_entry<T, size> *
+	soft_tcam_entry<T, size>::get_prev()
+	{
+		++m_access_counter;
+		return m_prev;
 	}
 
 	template <class T, size_t size>

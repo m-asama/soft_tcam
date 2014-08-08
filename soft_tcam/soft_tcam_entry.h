@@ -69,6 +69,16 @@ namespace soft_tcam {
 		soft_tcam_entry<T, size> *get_next();
 
 		/*
+		 * prev setter
+		 */
+		void set_prev(soft_tcam_entry<T, size> *prev);
+
+		/*
+		 * prev getter
+		 */
+		soft_tcam_entry<T, size> *get_prev();
+
+		/*
 		 * node setter
 		 */
 		void set_node(soft_tcam_node<T, size> *node);
@@ -88,6 +98,7 @@ namespace soft_tcam {
 		std::uint32_t m_priority;
 		T m_object;
 		soft_tcam_entry<T, size> *m_next;
+		soft_tcam_entry<T, size> *m_prev;
 		soft_tcam_node<T, size> *m_node;
 		std::uint64_t m_access_counter;
 

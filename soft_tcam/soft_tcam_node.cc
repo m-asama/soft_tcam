@@ -19,11 +19,31 @@ namespace soft_tcam {
 		m_parent = nullptr;
 		m_entries = nullptr;
 		m_access_counter = 0;
+
+		m_list_next = s_list_head;
+		s_list_head = this;
 	}
 
 	template<class T, size_t size>
 	soft_tcam_node<T, size>::~soft_tcam_node()
 	{
+		soft_tcam_node<T, size> *curr, *prev;
+
+		if (s_list_head == this) {
+			s_list_head = m_list_next;
+			return;
+		}
+
+		prev = s_list_head;
+		curr = s_list_head->m_list_next;
+		while (curr != nullptr) {
+			if (curr == this) {
+				prev->m_list_next = m_list_next;
+				return;
+			}
+			prev = curr;
+			curr = curr->m_list_next;
+		}
 	}
 
 	template<class T, size_t size>
@@ -43,6 +63,13 @@ namespace soft_tcam {
 	}
 
 	template<class T, size_t size>
+	void
+	soft_tcam_node<T, size>::set_data(const std::bitset<size> &data)
+	{
+		m_data = data;
+	}
+
+	template<class T, size_t size>
 	const std::bitset<size> &
 	soft_tcam_node<T, size>::get_data()
 	{
@@ -51,11 +78,25 @@ namespace soft_tcam {
 	}
 
 	template<class T, size_t size>
+	void
+	soft_tcam_node<T, size>::set_mask(const std::bitset<size> &mask)
+	{
+		m_mask = mask;
+	}
+
+	template<class T, size_t size>
 	const std::bitset<size> &
 	soft_tcam_node<T, size>::get_mask()
 	{
 		++m_access_counter;
 		return m_mask;
+	}
+
+	template<class T, size_t size>
+	void
+	soft_tcam_node<T, size>::set_position(std::uint32_t position)
+	{
+		m_position = position;
 	}
 
 	template<class T, size_t size>
@@ -127,11 +168,39 @@ namespace soft_tcam {
 	}
 
 	template<class T, size_t size>
+	void
+	soft_tcam_node<T, size>::set_entry_head(soft_tcam_entry<T, size> *entry_head)
+	{
+		m_entries = entry_head;
+	}
+
+	template<class T, size_t size>
 	soft_tcam_entry<T, size> *
 	soft_tcam_node<T, size>::get_entry_head()
 	{
 		++m_access_counter;
 		return m_entries;
+	}
+
+	template<class T, size_t size>
+	soft_tcam_node<T, size> *
+	soft_tcam_node<T, size>::get_list_next()
+	{
+		return m_list_next;
+	}
+
+	template<class T, size_t size>
+	void
+	soft_tcam_node<T, size>::set_access_counter(std::uint64_t access_counter)
+	{
+		m_access_counter = access_counter;
+	}
+
+	template<class T, size_t size>
+	std::uint64_t
+	soft_tcam_node<T, size>::get_access_counter()
+	{
+		return m_access_counter;
 	}
 
 	template<class T, size_t size>
@@ -232,12 +301,21 @@ namespace soft_tcam {
 	}
 
 	template<class T, size_t size>
+	soft_tcam_node<T, size> *
+	soft_tcam_node<T, size>::get_list_head()
+	{
+		return s_list_head;
+	}
+
+	template<class T, size_t size>
 	std::uint64_t
 	soft_tcam_node<T, size>::get_alloc_counter()
 	{
 		return s_alloc_counter;
 	}
 
+	template<class T, size_t size>
+		soft_tcam_node<T, size> *soft_tcam_node<T, size>::s_list_head = nullptr;
 	template<class T, size_t size>
 		std::uint64_t soft_tcam_node<T, size>::s_alloc_counter = 0;
 

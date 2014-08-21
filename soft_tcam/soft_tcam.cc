@@ -4,7 +4,12 @@
  */
 
 #include <iostream>
+#include <algorithm>
+#include <functional>
 #include <stack>
+#include <vector>
+#include <map>
+#include <queue>
 #include <cstdlib>
 #include <cstdio>
 
@@ -19,15 +24,52 @@ namespace soft_tcam {
 	soft_tcam<T, size>::soft_tcam()
 	{
 		m_root = nullptr;
+
+		m_list_next = s_list_head;
+		s_list_head = this;
 	}
 
 	template<class T, size_t size>
 	soft_tcam<T, size>::~soft_tcam()
 	{
+		soft_tcam<T, size> *curr, *prev;
+
 		if (m_root != nullptr) {
 			destroy_node(m_root);
 			m_root = nullptr;
 		}
+
+		if (s_list_head == this) {
+			s_list_head = m_list_next;
+			return;
+		}
+
+		prev = s_list_head;
+		curr = s_list_head->m_list_next;
+		while (curr != nullptr) {
+			if (curr == this) {
+				prev->m_list_next = m_list_next;
+				return;
+			}
+			prev = curr;
+			curr = curr->m_list_next;
+		}
+	}
+
+	template<class T, size_t size>
+	void *
+	soft_tcam<T, size>::operator new(size_t s)
+	{
+		++s_alloc_counter;
+		return malloc(s);
+	}
+
+	template<class T, size_t size>
+	void
+	soft_tcam<T, size>::operator delete(void *p)
+	{
+		--s_alloc_counter;
+		free(p);
 	}
 
 	template<class T, size_t size>
@@ -201,6 +243,46 @@ namespace soft_tcam {
 		node->set_ndc(nullptr);
 		node->set_parent(nullptr);
 		delete node;
+
+		/*
+		soft_tcam_entry<T, size> *entry, *etemp;
+		soft_tcam_node<T, size> *parent, *ntemp;
+
+		ntemp = node;
+		while (ntemp != nullptr) {
+			if ((ntemp->get_n0() == nullptr)
+			 && (ntemp->get_n1() == nullptr)
+			 && (ntemp->get_ndc() == nullptr)) {
+				entry = ntemp->get_entry_head();
+				while (entry != nullptr) {
+					etemp = entry->get_next();
+					ntemp->erase_entry(entry);
+					entry = etemp;
+				}
+				parent = ntemp->get_parent();
+				if (parent->get_n0() == ntemp) {
+					parent->set_n0(nullptr);
+				} else if (parent->get_n1() == ntemp) {
+					parent->set_n1(nullptr);
+				} else if (parent->get_ndc() == ntemp){
+					parent->set_ndc(nullptr);
+				} else {
+					std::cout << "XXX" << std::endl;
+				}
+				ntemp->set_parent(nullptr);
+				// delete ntemp;
+				ntemp = parent;
+			} else if (ntemp->get_n0() != nullptr) {
+				ntemp = ntemp->get_n0();
+			} else if (ntemp->get_n1() != nullptr) {
+				ntemp = ntemp->get_n1();
+			} else if (ntemp->get_ndc() != nullptr) {
+				ntemp = ntemp->get_ndc();
+			} else {
+				std::cout << "XXX" << std::endl;
+			}
+		}
+		*/
 	}
 
 	template<class T, size_t size>
@@ -488,6 +570,342 @@ retry:
 			dump_node(node->get_ndc(), depth + 1);
 		}
 	}
+
+	template<class T, size_t size>
+	static bool comp_node_by_memory_address(soft_tcam_node<T, size> * &l, soft_tcam_node<T, size> * &r)
+	{
+		return (l < r);
+	}
+
+	template<class T, size_t size>
+	static bool comp_node_by_access_counter(soft_tcam_node<T, size> * &l, soft_tcam_node<T, size> * &r)
+	{
+		return (l->get_access_counter() > r->get_access_counter());
+	}
+
+	template<class T, size_t size>
+	static bool comp_entry_by_memory_address(soft_tcam_entry<T, size> * &l, soft_tcam_entry<T, size> * &r)
+	{
+		return (l < r);
+	}
+
+	template<class T, size_t size>
+	static bool comp_entry_by_access_counter(soft_tcam_entry<T, size> * &l, soft_tcam_entry<T, size> * &r)
+	{
+		return (l->get_access_counter() > r->get_access_counter());
+	}
+
+	template<class T, size_t size>
+	static void
+	sort_nodes(std::vector<soft_tcam_node<T, size> *> &nv1, std::vector<soft_tcam_node<T, size> *> &nv2,
+			std::map<soft_tcam_node<T, size> *, soft_tcam_node<T, size> *> &nm,
+			std::map<soft_tcam_entry<T, size> *, soft_tcam_entry<T, size> *> &em)
+	{
+		std::cerr << "Sorting nodes...";
+		std::bitset<size> *data = new std::bitset<size>[nv1.size()];
+		std::bitset<size> *mask = new std::bitset<size>[nv1.size()];
+		std::uint32_t *position = new std::uint32_t[nv1.size()];
+		soft_tcam_node<T, size> **n0 = new soft_tcam_node<T, size> *[nv1.size()];
+		soft_tcam_node<T, size> **n1 = new soft_tcam_node<T, size> *[nv1.size()];
+		soft_tcam_node<T, size> **ndc = new soft_tcam_node<T, size> *[nv1.size()];
+		soft_tcam_node<T, size> **parent = new soft_tcam_node<T, size> *[nv1.size()];
+		soft_tcam_entry<T, size> **entries = new soft_tcam_entry<T, size> *[nv1.size()];
+		std::uint64_t *access_counter = new std::uint64_t[nv1.size()];
+		for (std::uint32_t i = 0; i < nv1.size(); ++i) {
+			data[i] = nv1[i]->get_data();
+			mask[i] = nv1[i]->get_mask();
+			position[i] = nv1[i]->get_position();
+			n0[i] = nv1[i]->get_n0();
+			n1[i] = nv1[i]->get_n1();
+			ndc[i] = nv1[i]->get_ndc();
+			parent[i] = nv1[i]->get_parent();
+			entries[i] = nv1[i]->get_entry_head();
+			access_counter[i] = nv1[i]->get_access_counter();
+		}
+		for (std::uint32_t i = 0; i < nv1.size(); ++i) {
+			nv2[i]->set_data(data[i]);
+			nv2[i]->set_mask(mask[i]);
+			nv2[i]->set_position(position[i]);
+			nv2[i]->set_n0(nm.at(n0[i]));
+			nv2[i]->set_n1(nm.at(n1[i]));
+			nv2[i]->set_ndc(nm.at(ndc[i]));
+			nv2[i]->set_parent(nm.at(parent[i]));
+			nv2[i]->set_entry_head(em.at(entries[i]));
+			nv2[i]->set_access_counter(access_counter[i]);
+		}
+		delete[] data;
+		delete[] mask;
+		delete[] position;
+		delete[] n0;
+		delete[] n1;
+		delete[] ndc;
+		delete[] parent;
+		delete[] entries;
+		delete[] access_counter;
+		std::cerr << "done." << std::endl;
+	}
+
+	template<class T, size_t size>
+	static void
+	sort_entries(std::vector<soft_tcam_entry<T, size> *> &ev1, std::vector<soft_tcam_entry<T, size> *> &ev2,
+			std::map<soft_tcam_node<T, size> *, soft_tcam_node<T, size> *> &nm,
+			std::map<soft_tcam_entry<T, size> *, soft_tcam_entry<T, size> *> &em)
+	{
+		std::cerr << "Sorting entries...";
+		std::uint32_t *priority = new std::uint32_t[ev1.size()];
+		T *object = new T[ev1.size()];
+		soft_tcam_entry<T, size> **next = new soft_tcam_entry<T, size> *[ev1.size()];
+		soft_tcam_entry<T, size> **prev = new soft_tcam_entry<T, size> *[ev1.size()];
+		soft_tcam_node<T, size> **node = new soft_tcam_node<T, size> *[ev1.size()];
+		std::uint64_t *access_counter = new std::uint64_t[ev1.size()];
+		for (std::uint32_t i = 0; i < ev1.size(); ++i) {
+			priority[i] = ev1[i]->get_priority();
+			object[i] = ev1[i]->get_object();
+			next[i] = ev1[i]->get_next();
+			prev[i] = ev1[i]->get_prev();
+			node[i] = ev1[i]->get_node();
+			access_counter[i] = ev1[i]->get_access_counter();
+		}
+		for (std::uint32_t i = 0; i < ev1.size(); ++i) {
+			ev2[i]->set_priority(priority[i]);
+			ev2[i]->set_object(object[i]);
+			ev2[i]->set_next(em.at(next[i]));
+			ev2[i]->set_prev(em.at(prev[i]));
+			ev2[i]->set_node(nm.at(node[i]));
+			ev2[i]->set_access_counter(access_counter[i]);
+		}
+		delete[] priority;
+		delete[] object;
+		delete[] next;
+		delete[] prev;
+		delete[] node;
+		delete[] access_counter;
+		std::cerr << "done." << std::endl;
+	}
+
+	template<class T, size_t size>
+	void
+	soft_tcam<T, size>::sort_best()
+	{
+		std::vector<soft_tcam_node<T, size> *> nv1, nv2;
+		std::vector<soft_tcam_entry<T, size> *> ev1, ev2;
+		std::map<soft_tcam_node<T, size> *, soft_tcam_node<T, size> *> nm;
+		std::map<soft_tcam_entry<T, size> *, soft_tcam_entry<T, size> *> em;
+		soft_tcam_node<T, size> *node;
+		soft_tcam_entry<T, size> *entry;
+		soft_tcam<T, size> *tcam;
+
+		std::cerr << "Making sorted node index...";
+		node = soft_tcam_node<T, size>::get_list_head();
+		while (node != nullptr) {
+			nv1.push_back(node);
+			node = node->get_list_next();
+		}
+		nv2 = nv1;
+		std::sort(nv1.begin(), nv1.end(), comp_node_by_access_counter<T, size>);
+		std::sort(nv2.begin(), nv2.end(), comp_node_by_memory_address<T, size>);
+		for (std::uint32_t i = 0; i < nv1.size(); ++i) {
+			nm.insert(std::make_pair(nv1[i], nv2[i]));
+		}
+		nm.insert(std::make_pair(nullptr, nullptr));
+		std::cerr << "done." << std::endl;
+
+		std::cerr << "Making sorted entry index...";
+		entry = soft_tcam_entry<T, size>::get_list_head();
+		while (entry != nullptr) {
+			ev1.push_back(entry);
+			entry = entry->get_list_next();
+		}
+		ev2 = ev1;
+		std::sort(ev1.begin(), ev1.end(), comp_entry_by_access_counter<T, size>);
+		std::sort(ev2.begin(), ev2.end(), comp_entry_by_memory_address<T, size>);
+		for (std::uint32_t i = 0; i < ev1.size(); ++i) {
+			em.insert(std::make_pair(ev1[i], ev2[i]));
+		}
+		em.insert(std::make_pair(nullptr, nullptr));
+		std::cerr << "done." << std::endl;
+
+		/*
+		for (std::uint32_t i = 0; i < nv1.size(); ++i) {
+			std::cerr << "nv1[" << i << "]:" << nv1[i]
+				  << " <=> "
+				  << "nv2[" << i << "]:" << nv2[i]
+				  << " " << nv1[i]->get_access_counter()
+				  << std::endl;
+		}
+		*/
+
+		tcam = s_list_head;
+		while (tcam != nullptr) {
+			tcam->m_root = nm.at(tcam->m_root);
+			tcam = tcam->m_list_next;
+		}
+		sort_nodes(nv1, nv2, nm, em);
+		sort_entries(ev1, ev2, nm, em);
+	}
+
+	template<class T, size_t size>
+	void
+	soft_tcam<T, size>::sort_worst()
+	{
+		std::vector<soft_tcam_node<T, size> *> nv1, nv2;
+		std::vector<soft_tcam_entry<T, size> *> ev1, ev2;
+		std::map<soft_tcam_node<T, size> *, soft_tcam_node<T, size> *> nm;
+		std::map<soft_tcam_entry<T, size> *, soft_tcam_entry<T, size> *> em;
+		std::map<std::uint64_t, std::queue<soft_tcam_node<T, size> *>> nvm;
+		std::map<std::uint64_t, std::queue<soft_tcam_entry<T, size> *>> evm;
+		soft_tcam_node<T, size> *node;
+		soft_tcam_entry<T, size> *entry;
+		soft_tcam<T, size> *tcam;
+
+		std::cerr << "Making sorted node index...";
+		node = soft_tcam_node<T, size>::get_list_head();
+		while (node != nullptr) {
+			nv1.push_back(node);
+			node = node->get_list_next();
+		}
+		nv2 = nv1;
+		std::sort(nv1.begin(), nv1.end(), comp_node_by_access_counter<T, size>);
+		std::sort(nv2.begin(), nv2.end(), comp_node_by_memory_address<T, size>);
+		for (std::uint32_t i = 0; i < nv2.size(); ++i) {
+			std::uint64_t k = reinterpret_cast<std::uint64_t>(nv2[i]) / 4096;
+			if (nvm.count(k) > 0) {
+				nvm.at(k).push(nv2[i]);
+			} else {
+				std::queue<soft_tcam_node<T, size> *> q;
+				q.push(nv2[i]);
+				nvm.insert(std::make_pair(k, q));
+			}
+		}
+		std::uint32_t nremain = nv2.size();
+		nv2.clear();
+		while (nremain > 0) {
+			for (auto it = nvm.begin(); it != nvm.end(); ++it) {
+				if (!it->second.empty()) {
+					nv2.push_back(it->second.front());
+					it->second.pop();
+					--nremain;
+				}
+			}
+		}
+		for (std::uint32_t i = 0; i < nv1.size(); ++i) {
+			nm.insert(std::make_pair(nv1[i], nv2[i]));
+		}
+		nm.insert(std::make_pair(nullptr, nullptr));
+		std::cerr << "done." << std::endl;
+
+		std::cerr << "Making sorted entry index...";
+		entry = soft_tcam_entry<T, size>::get_list_head();
+		while (entry != nullptr) {
+			ev1.push_back(entry);
+			entry = entry->get_list_next();
+		}
+		ev2 = ev1;
+		std::sort(ev1.begin(), ev1.end(), comp_entry_by_access_counter<T, size>);
+		std::sort(ev2.begin(), ev2.end(), comp_entry_by_memory_address<T, size>);
+		for (std::uint32_t i = 0; i < ev2.size(); ++i) {
+			std::uint64_t k = reinterpret_cast<std::uint64_t>(ev2[i]) / 4096;
+			if (evm.count(k) > 0) {
+				evm.at(k).push(ev2[i]);
+			} else {
+				std::queue<soft_tcam_entry<T, size> *> q;
+				q.push(ev2[i]);
+				evm.insert(std::make_pair(k, q));
+			}
+		}
+		std::uint32_t eremain = ev2.size();
+		ev2.clear();
+		while (eremain > 0) {
+			for (auto it = evm.begin(); it != evm.end(); ++it) {
+				if (!it->second.empty()) {
+					ev2.push_back(it->second.front());
+					it->second.pop();
+					--eremain;
+				}
+			}
+		}
+		for (std::uint32_t i = 0; i < ev1.size(); ++i) {
+			em.insert(std::make_pair(ev1[i], ev2[i]));
+		}
+		em.insert(std::make_pair(nullptr, nullptr));
+		std::cerr << "done." << std::endl;
+
+		/*
+		for (std::uint32_t i = 0; i < nv1.size(); ++i) {
+			std::cerr << "nv1[" << i << "]:" << nv1[i]
+				  << " <=> "
+				  << "nv2[" << i << "]:" << nv2[i]
+				  << " " << nv1[i]->get_access_counter()
+				  << std::endl;
+		}
+		for (std::uint32_t i = 0; i < ev1.size(); ++i) {
+			std::cerr << "ev1[" << i << "]:" << ev1[i]
+				  << " <=> "
+				  << "ev2[" << i << "]:" << ev2[i]
+				  << " " << ev1[i]->get_access_counter()
+				  << std::endl;
+		}
+		*/
+
+		tcam = s_list_head;
+		while (tcam != nullptr) {
+			tcam->m_root = nm.at(tcam->m_root);
+			tcam = tcam->m_list_next;
+		}
+		sort_nodes(nv1, nv2, nm, em);
+		sort_entries(ev1, ev2, nm, em);
+	}
+
+	template<class T, size_t size>
+	void
+	soft_tcam<T, size>::clear_access_counter()
+	{
+		soft_tcam_node<T, size> *node;
+		soft_tcam_entry<T, size> *entry;
+
+		node = soft_tcam_node<T, size>::get_list_head();
+		while (node != nullptr) {
+			node->set_access_counter(0);
+			node = node->get_list_next();
+		}
+
+		entry = soft_tcam_entry<T, size>::get_list_head();
+		while (entry != nullptr) {
+			entry->set_access_counter(0);
+			entry = entry->get_list_next();
+		}
+	}
+
+	template<class T, size_t size>
+	void
+	soft_tcam<T, size>::dump_access_counter()
+	{
+		soft_tcam_node<T, size> *node;
+		soft_tcam_entry<T, size> *entry;
+		std::uint64_t n = 0, e = 0;
+
+		node = soft_tcam_node<T, size>::get_list_head();
+		while (node != nullptr) {
+			std::cout << "N\t" << node << "\t" << node->get_access_counter() << std::endl;
+			n += node->get_access_counter();
+			node = node->get_list_next();
+		}
+
+		entry = soft_tcam_entry<T, size>::get_list_head();
+		while (entry != nullptr) {
+			std::cout << "E\t" << entry << "\t" << entry->get_access_counter() << std::endl;
+			e += entry->get_access_counter();
+			entry = entry->get_list_next();
+		}
+
+		std::cout << " node total access  : " << n << std::endl;
+		std::cout << " entry total access : " << e << std::endl;
+	}
+
+	template<class T, size_t size>
+		soft_tcam<T, size> *soft_tcam<T, size>::s_list_head = nullptr;
+	template<class T, size_t size>
+		std::uint64_t soft_tcam<T, size>::s_alloc_counter = 0;
 
 }
 

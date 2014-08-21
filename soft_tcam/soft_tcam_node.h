@@ -40,14 +40,29 @@ namespace soft_tcam {
 		void operator delete(void *p);
 
 		/*
+		 * data setter
+		 */
+		void set_data(const std::bitset<size> &data);
+
+		/*
 		 * data getter
 		 */
 		const std::bitset<size> &get_data();
 
 		/*
+		 * mask setter
+		 */
+		void set_mask(const std::bitset<size> &mask);
+
+		/*
 		 * mask getter
 		 */
 		const std::bitset<size> &get_mask();
+
+		/*
+		 * position setter
+		 */
+		void set_position(std::uint32_t position);
 
 		/*
 		 * position getter
@@ -95,9 +110,29 @@ namespace soft_tcam {
 		soft_tcam_node<T, size> *get_parent();
 
 		/*
+		 * set_entry_head
+		 */
+		void set_entry_head(soft_tcam_entry<T, size> *entry_head);
+
+		/*
 		 * get_entry_head
 		 */
 		soft_tcam_entry<T, size> *get_entry_head();
+
+		/*
+		 * get_list_next
+		 */
+		soft_tcam_node<T, size> *get_list_next();
+
+		/*
+		 * set_access_counter
+		 */
+		void set_access_counter(std::uint64_t access_counter);
+
+		/*
+		 * get_access_counter
+		 */
+		std::uint64_t get_access_counter();
 
 		/*
 		 * insert_entry
@@ -110,22 +145,29 @@ namespace soft_tcam {
 		int erase_entry(soft_tcam_entry<T, size> *entry);
 
 		/*
+		 * get_list_head
+		 */
+		static soft_tcam_node<T, size> *get_list_head();
+
+		/*
 		 * get_alloc_counter
 		 */
 		static std::uint64_t get_alloc_counter();
 
 	private:
 
-		const std::bitset<size> m_data;
-		const std::bitset<size> m_mask;
-		const std::uint32_t m_position;
+		std::bitset<size> m_data;
+		std::bitset<size> m_mask;
+		std::uint32_t m_position;
 		soft_tcam_node<T, size> *m_n0;
 		soft_tcam_node<T, size> *m_n1;
 		soft_tcam_node<T, size> *m_ndc;
 		soft_tcam_node<T, size> *m_parent;
 		soft_tcam_entry<T, size> *m_entries;
+		soft_tcam_node<T, size> *m_list_next;
 		std::uint64_t m_access_counter;
 
+		static soft_tcam_node<T, size> *s_list_head;
 		static std::uint64_t s_alloc_counter;
 
 	};

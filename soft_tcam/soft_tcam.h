@@ -31,6 +31,16 @@ namespace soft_tcam {
 		virtual ~soft_tcam();
 
 		/*
+		 * new operator overload
+		 */
+		void *operator new(size_t s);
+
+		/*
+		 * delete operator overload
+		 */
+		void operator delete(void *p);
+
+		/*
 		 * insert
 		 */
 		int insert(const std::bitset<size> &data, const std::bitset<size> &mask, std::uint32_t priority,
@@ -52,9 +62,30 @@ namespace soft_tcam {
 		 */
 		void dump();
 
+		/*
+		 * sort best
+		 */
+		static void sort_best();
+
+		/*
+		 * soft worst
+		 */
+		static void sort_worst();
+
+		/*
+		 * clear access counter
+		 */
+		static void clear_access_counter();
+
+		/*
+		 * dump_access_counter
+		 */
+		static void dump_access_counter();
+
 	private:
 
 		soft_tcam_node<T, size> *m_root;
+		soft_tcam<T, size> *m_list_next;
 
 		void destroy_node(soft_tcam_node<T, size> *node);
 		bool key_is_in_data_and_mask(const std::bitset<size> &data, const std::bitset<size> &mask,
@@ -66,6 +97,9 @@ namespace soft_tcam {
 				const std::bitset<size> &mask);
 		soft_tcam_entry<T, size> *find_entry(const std::bitset<size> &key);
 		void dump_node(soft_tcam_node<T, size> *node, int depth);
+
+		static soft_tcam<T, size> *s_list_head;
+		static std::uint64_t s_alloc_counter;
 
 	};
 

@@ -89,6 +89,31 @@ namespace soft_tcam {
 		soft_tcam_node<T, size> *get_node();
 
 		/*
+		 * set_list_next
+		 */
+		void set_list_next(soft_tcam_entry<T, size> *list_next);
+
+		/*
+		 * get_list_next
+		 */
+		soft_tcam_entry<T, size> *get_list_next();
+
+		/*
+		 * set_access_counter
+		 */
+		void set_access_counter(std::uint64_t access_counter);
+
+		/*
+		 * get_access_counter
+		 */
+		std::uint64_t get_access_counter();
+
+		/*
+		 * get_list_head
+		 */
+		static soft_tcam_entry<T, size> *get_list_head();
+
+		/*
 		 * get_alloc_counter
 		 */
 		static std::uint64_t get_alloc_counter();
@@ -100,8 +125,10 @@ namespace soft_tcam {
 		soft_tcam_entry<T, size> *m_next;
 		soft_tcam_entry<T, size> *m_prev;
 		soft_tcam_node<T, size> *m_node;
+		soft_tcam_entry<T, size> *m_list_next;
 		std::uint64_t m_access_counter;
 
+		static soft_tcam_entry<T, size> *s_list_head;
 		static std::uint64_t s_alloc_counter;
 
 	};

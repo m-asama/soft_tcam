@@ -5,149 +5,202 @@
 
 #include <bitset>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
+#include <string>
+#include <cstring>
 
 #include <time.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
 #include "soft_tcam.h"
 
-void
-print_time(const struct timeval &tv1, const struct timeval &tv2, const struct rusage &ru1, const struct rusage &ru2)
+static const std::uint64_t bench_count = 10000000;
+static const std::uint64_t warmup_count = 1000;
+
+static int
+load_fullroute(soft_tcam::soft_tcam<std::uint32_t, 32> &tcam, const char *fullroute_path)
 {
-	struct timeval tv;
-	struct rusage ru;
-	double r, u, s;
+	struct in_addr ina;
+	// struct in6_addr in6a;
+	std::ifstream fullroute_file;
+	std::string line;
+	char buf[1024 + 1];
+	char *plens;
+	int plen;
+	std::bitset<32> d, m;
 
-	timersub(&tv2, &tv1, &tv);
-	timersub(&ru2.ru_utime, &ru1.ru_utime, &ru.ru_utime);
-	timersub(&ru2.ru_stime, &ru1.ru_stime, &ru.ru_stime);
+	fullroute_file.open(fullroute_path);
+	if (fullroute_file.fail()) {
+		std::cout << fullroute_path <<  " open failed." << std::endl;
+		exit(1);
+	}
 
-	r = tv.tv_usec;
-	r /= 1000000;
-	r += tv.tv_sec;
+	std::cout << "Loading fullroute...";
+	std::cout.flush();
 
-	u = ru.ru_utime.tv_usec;
-	u /= 1000000;
-	u += ru.ru_utime.tv_sec;
+	while (getline(fullroute_file, line)) {
+		if (line.length() >= 1024) {
+			std::cout << "skip: " << line << std::endl;
+			continue;
+		}
+		std::strcpy(buf, line.c_str());
+		std::strtok(buf, "/");
+		plens = std::strtok(nullptr, "/");
+		if (plens == nullptr) {
+			std::cout << "skip: " << line << std::endl;
+			continue;
+		}
+		plen = atoi(plens);
+		if (inet_pton(AF_INET, buf, &ina) <= 0) {
+			std::cout << "skip: " << line << std::endl;
+			continue;
+		}
+		if ((plen == 0) && (ina.s_addr != 0)) {
+			std::cout << "skip: " << line << std::endl;
+			continue;
+		}
+		d = ntohl(ina.s_addr);
+		m = (0xffffffff << (32 - plen));
+		if (tcam.insert(d, m, plen, ntohl(ina.s_addr)) != 0) {
+			std::cout << "skip: " << line << std::endl;
+			continue;
+		}
+	}
 
-	s = ru.ru_stime.tv_usec;
-	s /= 1000000;
-	s += ru.ru_stime.tv_sec;
+	std::cout << "done." << std::endl;
 
-	std::cout << "   real " << std::fixed << r << std::endl
-		  << "   user " << std::fixed << u << std::endl
-		  << "    sys " << std::fixed << s << std::endl;
+	return 0;
+}
+
+static int
+load_flow(std::vector<std::bitset<32>> &flows, const char *flow_path)
+{
+	struct in_addr ina;
+	// struct in6_addr in6a;
+	std::ifstream flow_file;
+	std::string line;
+	std::bitset<32> k;
+
+	flow_file.open(flow_path);
+	if (flow_file.fail()) {
+		std::cout << flow_path << " open failed." << std::endl;
+		exit(1);
+	}
+
+	std::cout << "Loading flow...";
+	std::cout.flush();
+
+	while (getline(flow_file, line)) {
+		if (inet_pton(AF_INET, line.c_str(), &ina) <= 0) {
+			std::cout << "skip: " << line << std::endl;
+			continue;
+		}
+		k = ntohl(ina.s_addr);
+		flows.push_back(k);
+	}
+
+	std::cout << "done." << std::endl;
+
+	return 0;
 }
 
 int
 main(int argc, char *argv[])
 {
-	soft_tcam::soft_tcam<std::uint64_t, 32> test;
-	// const std::uint64_t *result;
-	struct timeval tv1, tv2;
+	soft_tcam::soft_tcam<std::uint32_t, 32> *tcam;
+	std::vector<std::bitset<32>> flows;
+	const std::uint32_t *result;
 	struct rusage ru1, ru2;
 	std::uint64_t find_counter = 0;
 	double fps;
 
-	std::cout << "Inserting entries...";
-
-	gettimeofday(&tv1, (struct timezone *)NULL);
-	getrusage(RUSAGE_SELF, &ru1);
-
-	/*
-	for (std::uint64_t i = 0; i < 4096; ++i) {
-		for (std::uint64_t j = 0; j < 4096; ++j) {
-			std::bitset<32> d((i << 52) + (j << 20)), m(0xffff0000ffff0000);
-			test.insert(d, m, 1, std::uint64_t((i << 52) + (j << 20)));
-		}
+	if (argc != 5) {
+		std::cout << std::endl
+			  << "usage:" << std::endl
+			  << "        $ " << argv[0] << " fullroute learningflow targetaddr sort" << std::endl
+			  << std::endl
+			  << "where:" << std::endl
+			  << "      fullroute := Containing full route file (Ex. fullroute.sample)" << std::endl
+			  << "   learningflow := Containing learing flow file (Ex. learningflow.sample)" << std::endl
+			  << "     targetaddr := Target IPv4 address (Ex. 192.168.1.1)" << std::endl
+			  << "           sort := [ \"none\" | \"best\" | \"worst\" ]" << std::endl
+			  << std::endl;
+		exit(1);
 	}
-	*/
-	std::bitset<32> d;
-	std::bitset<32> m;
-	d = 0x12000000; m = 0xff000000; test.insert(d, m, 4, 1);
-	d = 0x12340000; m = 0xffff0000; test.insert(d, m, 3, 2);
-	d = 0x89ab0000; m = 0xffff0000; test.insert(d, m, 3, 3);
-	d = 0x12345600; m = 0xffffff00; test.insert(d, m, 2, 4);
-	d = 0x00000000; m = 0x00000000; test.insert(d, m, 1, 5);
 
-	gettimeofday(&tv2, (struct timezone *)NULL);
-	getrusage(RUSAGE_SELF, &ru2);
+	tcam = new soft_tcam::soft_tcam<std::uint32_t, 32>();
 
-	std::cout << "done." << std::endl;
-
-	print_time(tv1, tv2, ru1, ru2);
-
-	test.dump();
-
-	d = 0x00000000; m = 0x00000000; test.erase(d, m, 1, 5);
-	d = 0x12345600; m = 0xffffff00; test.erase(d, m, 2, 4);
-	d = 0x89ab0000; m = 0xffff0000; test.erase(d, m, 3, 3);
-	d = 0x12340000; m = 0xffff0000; test.erase(d, m, 3, 2);
-	d = 0x12000000; m = 0xff000000; test.erase(d, m, 4, 1);
-
-	test.dump();
+	load_fullroute(*tcam, argv[1]);
+	load_flow(flows, argv[2]);
 
 	std::cout << "Allocated soft_tcam_node = "
-		  << soft_tcam::soft_tcam_node<std::uint64_t, 32>::get_alloc_counter()
-		  << " ( " << (soft_tcam::soft_tcam_node<std::uint64_t, 32>::get_alloc_counter()
-					  * sizeof(soft_tcam::soft_tcam_node<std::uint64_t, 32>)) << " bytes)"
+		  << soft_tcam::soft_tcam_node<std::uint32_t, 32>::get_alloc_counter()
+		  << " ( " << (soft_tcam::soft_tcam_node<std::uint32_t, 32>::get_alloc_counter()
+			* sizeof(soft_tcam::soft_tcam_node<std::uint32_t, 32>)) << " bytes)"
 		  << std::endl;
 	std::cout << "Allocated soft_tcam_entry = "
-		  << soft_tcam::soft_tcam_entry<std::uint64_t, 32>::get_alloc_counter()
-		  << " ( " << (soft_tcam::soft_tcam_entry<std::uint64_t, 32>::get_alloc_counter()
-					  * sizeof(soft_tcam::soft_tcam_entry<std::uint64_t, 32>)) << " bytes)"
+		  << soft_tcam::soft_tcam_entry<std::uint32_t, 32>::get_alloc_counter()
+		  << " ( " << (soft_tcam::soft_tcam_entry<std::uint32_t, 32>::get_alloc_counter()
+			* sizeof(soft_tcam::soft_tcam_entry<std::uint32_t, 32>)) << " bytes)"
 		  << std::endl;
 
-	std::cout << "Finding entries...";
+	soft_tcam::soft_tcam<std::uint32_t, 32>::clear_access_counter();
 
-	gettimeofday(&tv1, (struct timezone *)NULL);
+	for (auto it = flows.begin(); it != flows.end(); ++it) {
+		tcam->find(*it);
+	}
+
+	if (!strncmp(argv[4], "best", 5)) {
+		soft_tcam::soft_tcam<std::uint32_t, 32>::sort_best();
+	} else if (!strncmp(argv[4], "worst", 6)) {
+		soft_tcam::soft_tcam<std::uint32_t, 32>::sort_worst();
+	} else if (!strncmp(argv[4], "none", 5)) {
+	} else {
+		std::cout << "sort arg error" << std::endl;
+		exit(1);
+	}
+
+	struct in_addr ina;
+	std::bitset<32> k;
+	if (inet_pton(AF_INET, argv[3], &ina) <= 0) {
+		std::cout << "inet_pton error" << std::endl;
+		exit(1);
+	}
+	k = ntohl(ina.s_addr);
+
+	for (std::uint64_t i = 0; i < warmup_count; ++i) {
+		tcam->find(k);
+	}
+
 	getrusage(RUSAGE_SELF, &ru1);
 
-	/*
-	for (std::uint64_t i = 0; i < 4096; ++i) {
-		for (std::uint64_t j = 0; j < 4096; ++j) {
-			result = test.find(std::bitset<32>((i << 52) + (j << 20)));
-			// result = test.find(std::bitset<32>(0x1234000223450002));
-			std::cout << std::setw(16)
-				  << std::setfill('0')
-				  << std::hex
-				  << ((i << 52) + (j << 20))
-				  << " : ";
-			if (result != nullptr) {
-				std::cout << std::setw(16)
-					  << std::setfill('0')
-					  << std::hex
-					  << *result
-					  << std::endl;
-			} else {
-				std::cout << "nullptr" << std::endl;
-			}
-			++find_counter;
-		}
+	for (std::uint64_t i = 0; i < bench_count; ++i) {
+		result = tcam->find(k);
+		++find_counter;
 	}
-	*/
 
-	gettimeofday(&tv2, (struct timezone *)NULL);
 	getrusage(RUSAGE_SELF, &ru2);
 
-	std::cout << "done." << std::endl;
-
-	print_time(tv1, tv2, ru1, ru2);
-
-	timersub(&tv2, &tv1, &tv2);
-	fps = tv2.tv_usec;
+	timersub(&ru2.ru_utime, &ru1.ru_utime, &ru2.ru_utime);
+	fps = ru2.ru_utime.tv_usec;
 	fps /= 1000000;
-	fps += tv2.tv_sec;
+	fps += ru2.ru_utime.tv_sec;
 	fps = find_counter / fps;
-
 	std::cout << "Find counter = "
 		  << find_counter
 		  << std::endl;
 	std::cout << "Find per second = "
 		  << std::fixed << fps
 		  << std::endl;
+
+	// tcam->dump();
 
 	return 0;
 }

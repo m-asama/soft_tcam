@@ -10,6 +10,7 @@
 #include <vector>
 #include <map>
 #include <queue>
+#include <utility>
 #include <cstdlib>
 #include <cstdio>
 
@@ -243,62 +244,6 @@ namespace soft_tcam {
 		node->set_ndc(nullptr);
 		node->set_parent(nullptr);
 		delete node;
-
-		/*
-		soft_tcam_entry<T, size> *entry, *etemp;
-		soft_tcam_node<T, size> *parent, *ntemp;
-
-		ntemp = node;
-		while (ntemp != nullptr) {
-			if ((ntemp->get_n0() == nullptr)
-			 && (ntemp->get_n1() == nullptr)
-			 && (ntemp->get_ndc() == nullptr)) {
-				entry = ntemp->get_entry_head();
-				while (entry != nullptr) {
-					etemp = entry->get_next();
-					ntemp->erase_entry(entry);
-					entry = etemp;
-				}
-				parent = ntemp->get_parent();
-				if (parent->get_n0() == ntemp) {
-					parent->set_n0(nullptr);
-				} else if (parent->get_n1() == ntemp) {
-					parent->set_n1(nullptr);
-				} else if (parent->get_ndc() == ntemp){
-					parent->set_ndc(nullptr);
-				} else {
-					std::cout << "XXX" << std::endl;
-				}
-				ntemp->set_parent(nullptr);
-				// delete ntemp;
-				ntemp = parent;
-			} else if (ntemp->get_n0() != nullptr) {
-				ntemp = ntemp->get_n0();
-			} else if (ntemp->get_n1() != nullptr) {
-				ntemp = ntemp->get_n1();
-			} else if (ntemp->get_ndc() != nullptr) {
-				ntemp = ntemp->get_ndc();
-			} else {
-				std::cout << "XXX" << std::endl;
-			}
-		}
-		*/
-	}
-
-	template<class T, size_t size>
-	bool
-	soft_tcam<T, size>::key_is_in_data_and_mask(const std::bitset<size> &data, const std::bitset<size> &mask,
-			const std::bitset<size> &key)
-	{
-		bool result = true;
-
-		for (std::uint32_t i = 0; i < size; ++i) {
-			if ((mask[i] == 1) && (key[i] != data[i])) {
-				result = false;
-			}
-		}
-
-		return result;
 	}
 
 	template<class T, size_t size>
@@ -467,38 +412,55 @@ namespace soft_tcam {
 	soft_tcam<T, size>::find_entry(const std::bitset<size> &key)
 	{
 		soft_tcam_entry<T, size> *entry = nullptr;
-		soft_tcam_node<T, size> *node, *temp;
-		std::stack<soft_tcam_node<T, size> *> context;
+		soft_tcam_node<T, size> *node, *temp_node;
+		std::stack<std::pair<soft_tcam_node<T, size> *, size_t>> context;
+		size_t prev, curr;
 
+		prev = 0;
 		node = m_root;
 retry:
 		while (node != nullptr) {
-			if ((node->get_position() == size)
-			 && (key_is_in_data_and_mask(node->get_data(), node->get_mask(), key))) {
+			bool match = true;
+			const std::bitset<size> &data = node->get_data();
+			const std::bitset<size> &mask = node->get_mask();
+			curr = node->get_position();
+			for (size_t i = prev; i < curr; ++i) {
+				if ((mask[i] == 1) && (key[i] != data[i])) {
+					match = false;
+					break;
+				}
+			}
+			if (match == false) {
+				break;
+			}
+			if (curr == size) {
 				soft_tcam_entry<T, size> *temp_entry = node->get_entry_head();
 				if ((entry == nullptr)
 				 || (temp_entry->get_priority() > entry->get_priority())) {
 					entry = temp_entry;
 				}
 			}
-			temp = nullptr;
-			if (key[node->get_position()] == 0) {
-				temp = node->get_n0();
+			temp_node = nullptr;
+			if (key[curr] == 0) {
+				temp_node = node->get_n0();
 			}
-			if (key[node->get_position()] == 1) {
-				temp = node->get_n1();
+			if (key[curr] == 1) {
+				temp_node = node->get_n1();
 			}
 			if (node->get_ndc() != nullptr) {
-				if (temp != nullptr) {
-					context.push(node->get_ndc());
+				if (temp_node != nullptr) {
+					context.push(std::pair<soft_tcam_node<T, size> *, size_t>
+							(node->get_ndc(), curr));
 				} else {
-					temp = node->get_ndc();
+					temp_node = node->get_ndc();
 				}
 			}
-			node = temp;
+			prev = curr;
+			node = temp_node;
 		}
 		if (!context.empty()) {
-			node = context.top();
+			prev = context.top().second;
+			node = context.top().first;
 			context.pop();
 			goto retry;
 		}

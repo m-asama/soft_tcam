@@ -88,8 +88,6 @@ namespace soft_tcam {
 		soft_tcam<T, size> *m_list_next;
 
 		void destroy_node(soft_tcam_node<T, size> *node);
-		bool key_is_in_data_and_mask(const std::bitset<size> &data, const std::bitset<size> &mask,
-				const std::bitset<size> &key);
 		int insert_between(soft_tcam_node<T, size> *less, soft_tcam_node<T, size> *more,
 				soft_tcam_node<T, size> *node);
 		int erase_node(soft_tcam_node<T, size> *node);

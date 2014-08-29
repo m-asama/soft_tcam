@@ -6,11 +6,9 @@
 #include <iostream>
 #include <algorithm>
 #include <functional>
-#include <stack>
 #include <vector>
 #include <map>
 #include <queue>
-#include <utility>
 #include <cstdlib>
 #include <cstdio>
 
@@ -413,7 +411,8 @@ namespace soft_tcam {
 	{
 		soft_tcam_entry<T, size> *entry = nullptr;
 		soft_tcam_node<T, size> *node, *temp_node;
-		std::stack<std::pair<soft_tcam_node<T, size> *, size_t>> context;
+		soft_tcam_node<T, size> *stack_node[size], **stack_node_ptr = &stack_node[0];
+		size_t stack_size[size], *stack_size_ptr = &stack_size[0];
 		size_t prev, curr;
 
 		prev = 0;
@@ -449,8 +448,10 @@ retry:
 			}
 			if (node->get_ndc() != nullptr) {
 				if (temp_node != nullptr) {
-					context.push(std::pair<soft_tcam_node<T, size> *, size_t>
-							(node->get_ndc(), curr));
+					*stack_node_ptr = node->get_ndc();
+					*stack_size_ptr = curr;
+					++stack_node_ptr;
+					++stack_size_ptr;
 				} else {
 					temp_node = node->get_ndc();
 				}
@@ -458,10 +459,11 @@ retry:
 			prev = curr;
 			node = temp_node;
 		}
-		if (!context.empty()) {
-			prev = context.top().second;
-			node = context.top().first;
-			context.pop();
+		if (stack_node_ptr != &stack_node[0]) {
+			--stack_node_ptr;
+			--stack_size_ptr;
+			prev = *stack_size_ptr;
+			node = *stack_node_ptr;
 			goto retry;
 		}
 
